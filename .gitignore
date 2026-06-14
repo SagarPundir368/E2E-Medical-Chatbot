@@ -1,2 +1,13 @@
+## ENVIRONMENT
 .venv/
+
+## SECURITY KEYS
 .env
+
+## BOOK PDFS
+data/Medical_book.pdf
+data/AnatomyAndPhysiology-LR.pdf
+
+## PRACTICE VECTORSTORE
+FAISS/index.faiss
+FAISS/index.pkl
