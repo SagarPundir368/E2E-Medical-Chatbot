@@ -11,3 +11,7 @@ data/AnatomyAndPhysiology-LR.pdf
 ## PRACTICE VECTORSTORE
 FAISS/index.faiss
 FAISS/index.pkl
+
+## TESTING FILES
+test_pipelilne.py
+requirements.txt

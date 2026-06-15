@@ -24,6 +24,8 @@ def get_query_enhancer_chain(llm) -> ChatPromptTemplate:
     
     return prompt | llm | JsonOutputParser()
 
+
+
 def get_final_rag_chain(llm) -> ChatPromptTemplate:
     """Assembles the final grounded generation chain with message history tracking.
 
