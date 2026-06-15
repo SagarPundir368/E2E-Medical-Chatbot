@@ -7,3 +7,6 @@ The repository contains:
 - FAISS vector index
 
 which are sufficient to run the application.
+
+- Cmd to run the streamlit:-
+`uv run streamlit run app.py`

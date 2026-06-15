@@ -2,7 +2,7 @@ from langchain_core.prompts import ChatPromptTemplate, PromptTemplate, MessagesP
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 
 # Core prompt assets imported from your modular prompt script module
-from src.prompt import QUERY_ENHANCEMENT_PROMPT, FINAL_RESPONSE_SYSTEM_PROMPT
+from src.prompt import QUERY_ENHANCEMENT_PROMPT, FINAL_RESPONSE_SYSTEM_PROMPT,HISTORY_AWARE_QUERY_PROMPT
 
 def get_query_enhancer_chain(llm) -> ChatPromptTemplate:
     """Constructs the pre-retrieval query intelligence and translation chain.
@@ -24,6 +24,21 @@ def get_query_enhancer_chain(llm) -> ChatPromptTemplate:
     
     return prompt | llm | JsonOutputParser()
 
+
+
+def get_history_aware_query_chain(llm):
+
+    prompt = ChatPromptTemplate.from_messages([
+        ('system',HISTORY_AWARE_QUERY_PROMPT),
+        MessagesPlaceholder(variable_name="chat_history"),
+        ('human',"{query}")
+    ])
+
+    return (
+        prompt
+        | llm
+        | StrOutputParser()
+    )
 
 
 def get_final_rag_chain(llm) -> ChatPromptTemplate:

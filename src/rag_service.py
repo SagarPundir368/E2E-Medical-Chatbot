@@ -5,7 +5,7 @@ from typing import List, Dict, Any
 from src.config import RERANK_TOP_N
 from src.reranker import run_gpu_reranker
 from src.formatter import format_docs
-from src.chains import get_query_enhancer_chain, get_final_rag_chain
+from src.chains import get_query_enhancer_chain, get_history_aware_query_chain, get_final_rag_chain
 
 class MedicalRAGService:
     def __init__(self, llm, hybrid_retriever, reranker_model):
@@ -16,16 +16,30 @@ class MedicalRAGService:
         
         # Factory chain allocations
         self.query_enhancer_chain = get_query_enhancer_chain(llm)
+        self.history_aware_query_chain = get_history_aware_query_chain(llm)
         self.final_rag_chain = get_final_rag_chain(llm)
         
-    def enhance_query(self, query: str) -> Dict[str, Any]:
-        """Runs pre-retrieval expansion via LLM."""
-        # Fixed: Changed from self.query_chain to self.query_enhancer_chain
-        return self.query_enhancer_chain.invoke({"query": query})
-    
+    def enhance_query(self, query: str,chat_history: List) -> Dict[str, Any]:
+        """Resolves conversational pronouns first, then expands synonyms for vector lookups."""
+        # Step 1: Coreference resolution (Converts "how is it treated?" -> "treatment for Diabetes")
+        condensed_query = self.history_aware_query_chain.invoke(
+            {
+                "query": query,
+                "chat_history": chat_history 
+            }
+        )
+        
+        # Step 2: Pass the clean standalone text into your JSON query decomposition block
+        enhanced_output = self.query_enhancer_chain.invoke({"query": condensed_query})
+        
+        # Return BOTH queries so downstream components can use them appropriately
+        return {
+            "condensed_query": condensed_query,
+            "enhanced_query": enhanced_output
+        }
+
     def retrieve_documents(self, enhanced_query: str) -> List[Any]:
         """Gathers dense and sparse candidates from the index structure."""
-        # Fixed: Name standardized and updated to use .invoke()
         return self.hybrid_retriever.invoke(enhanced_query)
 
     def rerank_documents(self, original_query: str, docs: List[Any]) -> List[Any]:
@@ -47,15 +61,16 @@ class MedicalRAGService:
     
     def generate_response(self, user_query: str, chat_history: List[Any]) -> Dict[str, Any]:
         """Executes the master operational RAG pipeline timeline."""
-        # 1. Enhance
-        enhanced_output = self.enhance_query(user_query)
-        enhanced_query = enhanced_output.get("rewritten_query", user_query)
+        # 1. Enhance and unpack query
+        enhanced_output = self.enhance_query(user_query,chat_history)
+        condensed_query = enhanced_output['condensed_query']
+        enhanced_query = enhanced_output['enhanced_query'].get("rewritten_query", user_query)
 
         # 2. Retrieve
         retrieved_docs = self.retrieve_documents(enhanced_query)
 
         # 3. Rerank (Uses user_original_query for precision)
-        reranked_docs = self.rerank_documents(user_query, retrieved_docs)
+        reranked_docs = self.rerank_documents(condensed_query, retrieved_docs)
 
         # 4. Format
         formatted_context = format_docs(reranked_docs)
