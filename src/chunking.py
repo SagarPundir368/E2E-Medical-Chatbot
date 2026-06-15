@@ -4,6 +4,7 @@ from typing import List
 from langchain_community.document_loaders import PyMuPDFLoader, DirectoryLoader
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # Safe relative module references based on your project directory layout
 from src.config import DATA_DIR
@@ -68,6 +69,14 @@ def hybrid_chunking(clean_docs: List[Document],embedding_model) -> List[Document
     """
     # Performance Optimization: Passing documents directly to Semantic Chunker 
     # protects your GPU VRAM from loop thrashing while maintaining elite recall accuracy.
+    recursive_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=2000,
+    chunk_overlap=200,
+    separators=["\n\n","\n",". "," ",""]
+    )
+
+    recursive_docs = recursive_splitter.split_documents(clean_docs)
+
     semantic_chunker = SemanticChunker(
         embeddings=embedding_model,
         breakpoint_threshold_type="percentile",
@@ -75,11 +84,11 @@ def hybrid_chunking(clean_docs: List[Document],embedding_model) -> List[Document
     )
 
     print("Initiating semantic chunk division on GPU via BGE-M3...")
-    final_chunks = semantic_chunker.split_documents(clean_docs)
+    final_chunks = semantic_chunker.split_documents(recursive_docs)
     print(f"Successfully generated {len(final_chunks)} semantic chunks!")
 
     # Safe system-agnostic file path configuration
-    pickle_output_path = os.path.join(DATA_DIR, "semantic_chunks.pkl")
+    pickle_output_path = os.path.join(DATA_DIR,"processed_chunk", "semantic_chunks.pkl")
     
     with open(pickle_output_path, "wb") as f:
         pickle.dump(final_chunks, f)
