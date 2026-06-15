@@ -13,5 +13,9 @@ FAISS/index.faiss
 FAISS/index.pkl
 
 ## TESTING FILES
-test_pipelilne.py
+test_pipeline.py
 requirements.txt
+
+__pycache__/
+src/__pycache__/
+*.pyc
