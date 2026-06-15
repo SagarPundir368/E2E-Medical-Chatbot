@@ -18,6 +18,12 @@ from src.rag_service import MedicalRAGService
 # Set professional page layouts
 st.set_page_config(page_title="Clinical RAG Portal", page_icon="🩺", layout="wide")
 
+# Initialize session structures at the absolute top to avoid layout reset loops
+if "sessions" not in st.session_state:
+    st.session_state.sessions = {"Primary Consultation Thread": []}
+if "current_session" not in st.session_state:
+    st.session_state.current_session = "Primary Consultation Thread"
+
 # --- 1. DYNAMIC MODEL INITIALIZER FACTORY ---
 def build_selected_llm(provider: str, model_name: str, api_key: str):
     """Factory function that returns the correct LangChain model instance based on user input."""
@@ -46,16 +52,22 @@ with st.sidebar:
         type="password",
         placeholder=f"Paste your {selected_provider.lower()} key here..."
     )
+
+    if selected_provider == "Groq":
+        st.caption("🔑 Missing credentials? [Get your Groq API(Free) Key here](https://console.groq.com/keys).")
+    elif selected_provider == "OpenAI":
+        st.caption("🔑 Missing credentials? [Get your OpenAI API($Paid$) Key here](https://platform.openai.com/api-keys).")
     
     st.divider()
     st.title("📁 Patient Case Files")
     st.subheader("Manage Active Sessions")
     
-    # Multi-session initialization rules
-    if "sessions" not in st.session_state:
-        st.session_state.sessions = {"Primary Consultation Thread": []}
-    if "current_session" not in st.session_state:
-        st.session_state.current_session = "Primary Consultation Thread"
+   # Cleaner session tracking selector
+    st.session_state.current_session = st.selectbox(
+        "Select Active Consultation:",
+        options=list(st.session_state.sessions.keys()),
+        index=list(st.session_state.sessions.keys()).index(st.session_state.current_session)
+    )
         
     new_thread = st.text_input("Open New Consultation Case File:")
     if st.button("Initialize Case File") and new_thread.strip():
@@ -63,17 +75,17 @@ with st.sidebar:
             st.session_state.sessions[new_thread] = []
             st.session_state.current_session = new_thread
             st.rerun()
-            
-    st.session_state.current_session = st.selectbox(
-        "Select Active Consultation:",
-        options=list(st.session_state.sessions.keys()),
-        index=list(st.session_state.sessions.keys()).index(st.session_state.current_session)
-    )
     
     st.divider()
     device_type = "CUDA Tensor Cores" if torch.cuda.is_available() else "Local CPU Computing"
     st.info(f"💡 **Engine Details:** Running BGE-M3 Embeddings + Hybrid RRF Fusion Search via {device_type}.")
 
+# --- 4. MAIN DISPLAY ENTRY & AUTHENTICATION GUARDRAIL ---
+st.title("🩺 Advanced Medical Expert AI Agent")
+
+if not user_api_key.strip():
+    st.warning("🔑 Please enter your API Key in the sidebar configuration layout to unlock the RAG system dashboard.")
+    st.stop()  
 
 # --- 3. THE ARCHITECTURAL SPLIT: CACHE STATIC RETRIEVAL ASSETS ---
 @st.cache_resource
@@ -104,11 +116,11 @@ st.success("Streamlit Engine Core Loaded")
 embeddings, retriever, reranker = load_retrieval_assets()
 
 
-# --- 4. SECURE AUTHENTICATION GUARDRAIL ---
-if not user_api_key.strip():
-    st.title("🩺 Advanced Medical Expert AI Agent")
-    st.warning("🔑 Enter your API Key in the sidebar configuration layout to unlock the RAG system dashboard.")
-    st.stop()
+# # --- 4. SECURE AUTHENTICATION GUARDRAIL ---
+# if not user_api_key.strip():
+#     st.title("🩺 Advanced Medical Expert AI Agent")
+#     st.warning("🔑 Enter your API Key in the sidebar configuration layout to unlock the RAG system dashboard.")
+#     st.stop()
 
 # --- 5. DYNAMIC STEP-BY-STEP SERVICE ASSEMBLE ---
 # This block runs instantly on user interaction because the heavy database components are already in RAM!
@@ -128,7 +140,6 @@ except Exception as e:
 
 
 # --- 6. MAIN CHAT CONTAINER PRESENTATION ---
-st.title("🩺 Advanced Medical Expert AI Agent")
 st.caption(f"Active Case Track: `{st.session_state.current_session}` | Model: `{selected_model}`")
 active_history = st.session_state.sessions[st.session_state.current_session]
 
